@@ -126,50 +126,51 @@ def process_video_file(video_path, download_folder):
         print(f"Search URL: {result['url']}")
         print(f"\nFound {len(result['results'])} results:")
         if result['results']:
-            for i, item in enumerate(result['results'], 1):
-                print(f"{i}. {item['title']}")
-                print(f"   Language: {item['language']}")
-                print(f"   URL: {item['url']}\n")
+            # Only process the first result
+            item = result['results'][0]
+            print(f"1. {item['title']}")
+            print(f"   Language: {item['language']}")
+            print(f"   URL: {item['url']}\n")
+            
+            # Use the function to fetch the content
+            print("Fetching content of the result page using get_subtitle_page_content...")
+            page_content = get_subtitle_page_content(item['url'])
+            if page_content and "error" not in page_content:
+                print(f"Result Page Title: {page_content['page_title']}")
+                print(f"Status: {page_content['status']}")
                 
-                # Use the function to fetch the content
-                print("Fetching content of the result page using get_subtitle_page_content...")
-                page_content = get_subtitle_page_content(item['url'])
-                if page_content and "error" not in page_content:
-                    print(f"Result Page Title: {page_content['page_title']}")
-                    print(f"Status: {page_content['status']}")
-                    
-                    # Display Chinese download information
-                    chinese_info = page_content.get('chinese_downloads', {})
-                    if chinese_info:
-                        print(f"Chinese Simplified Available: {chinese_info.get('chinese_simplified', False)}")
-                        print(f"Chinese Traditional Available: {chinese_info.get('chinese_traditional', False)}")
-                        if chinese_info.get('download_links'):
-                            print("Chinese Download Links:")
-                            for lang, link in chinese_info['download_links'].items():
-                                print(f"  {lang}: {link}")
+                # Display Chinese download information
+                chinese_info = page_content.get('chinese_downloads', {})
+                if chinese_info:
+                    print(f"Chinese Simplified Available: {chinese_info.get('chinese_simplified', False)}")
+                    print(f"Chinese Traditional Available: {chinese_info.get('chinese_traditional', False)}")
+                    if chinese_info.get('download_links'):
+                        print("Chinese Download Links:")
+                        for lang, link in chinese_info['download_links'].items():
+                            print(f"  {lang}: {link}")
+                        
+                        # Download Chinese subtitle - now using filename_for_srt instead of keyword
+                        # Pass the download_folder parameter
+                        download_url, language, full_path = download_chinese_subtitle(chinese_info, filename_for_srt, download_folder)
+                        if download_url:  # download_url
+                            print(f"\nDownloading {language} subtitle...")
+                            print(f"Download URL: {download_url}")
                             
-                            # Download Chinese subtitle - now using filename_for_srt instead of keyword
-                            # Pass the download_folder parameter
-                            download_url, language, full_path = download_chinese_subtitle(chinese_info, filename_for_srt, download_folder)
-                            if download_url:  # download_url
-                                print(f"\nDownloading {language} subtitle...")
-                                print(f"Download URL: {download_url}")
-                                
-                                # Actually download the file
-                                success, message = download_subtitle_file(download_url, full_path)
-                                if success:
-                                    print(f"✅ {message}")
-                                else:
-                                    print(f"❌ {message}")
+                            # Actually download the file
+                            success, message = download_subtitle_file(download_url, full_path)
+                            if success:
+                                print(f"✅ {message}")
                             else:
-                                print("\nNo Chinese subtitle available for download")
+                                print(f"❌ {message}")
                         else:
-                            print("No Chinese download links found")
+                            print("\nNo Chinese subtitle available for download")
                     else:
-                        print("No Chinese downloads available")
+                        print("No Chinese download links found")
                 else:
-                    error_msg = page_content.get('error', 'Unknown error') if page_content else 'No content returned'
-                    print(f"Error fetching result page content: {error_msg}")
+                    print("No Chinese downloads available")
+            else:
+                error_msg = page_content.get('error', 'Unknown error') if page_content else 'No content returned'
+                print(f"Error fetching result page content: {error_msg}")
         else:
             print("No results found.")
     else:
@@ -334,50 +335,51 @@ def main():
             print(f"Search URL: {result['url']}")
             print(f"\nFound {len(result['results'])} results:")
             if result['results']:
-                for i, item in enumerate(result['results'], 1):
-                    print(f"{i}. {item['title']}")
-                    print(f"   Language: {item['language']}")
-                    print(f"   URL: {item['url']}\n")
+                # Only process the first result
+                item = result['results'][0]
+                print(f"1. {item['title']}")
+                print(f"   Language: {item['language']}")
+                print(f"   URL: {item['url']}\n")
+                
+                # Use the function to fetch the content
+                print("Fetching content of the result page using get_subtitle_page_content...")
+                page_content = get_subtitle_page_content(item['url'])
+                if page_content and "error" not in page_content:
+                    print(f"Result Page Title: {page_content['page_title']}")
+                    print(f"Status: {page_content['status']}")
                     
-                    # Use the function to fetch the content
-                    print("Fetching content of the result page using get_subtitle_page_content...")
-                    page_content = get_subtitle_page_content(item['url'])
-                    if page_content and "error" not in page_content:
-                        print(f"Result Page Title: {page_content['page_title']}")
-                        print(f"Status: {page_content['status']}")
-                        
-                        # Display Chinese download information
-                        chinese_info = page_content.get('chinese_downloads', {})
-                        if chinese_info:
-                            print(f"Chinese Simplified Available: {chinese_info.get('chinese_simplified', False)}")
-                            print(f"Chinese Traditional Available: {chinese_info.get('chinese_traditional', False)}")
-                            if chinese_info.get('download_links'):
-                                print("Chinese Download Links:")
-                                for lang, link in chinese_info['download_links'].items():
-                                    print(f"  {lang}: {link}")
+                    # Display Chinese download information
+                    chinese_info = page_content.get('chinese_downloads', {})
+                    if chinese_info:
+                        print(f"Chinese Simplified Available: {chinese_info.get('chinese_simplified', False)}")
+                        print(f"Chinese Traditional Available: {chinese_info.get('chinese_traditional', False)}")
+                        if chinese_info.get('download_links'):
+                            print("Chinese Download Links:")
+                            for lang, link in chinese_info['download_links'].items():
+                                print(f"  {lang}: {link}")
+                            
+                            # Download Chinese subtitle - now using filename_for_srt instead of keyword
+                            # Pass the download_folder parameter
+                            download_url, language, full_path = download_chinese_subtitle(chinese_info, filename_for_srt, download_folder)
+                            if download_url:  # download_url
+                                print(f"\nDownloading {language} subtitle...")
+                                print(f"Download URL: {download_url}")
                                 
-                                # Download Chinese subtitle - now using filename_for_srt instead of keyword
-                                # Pass the download_folder parameter
-                                download_url, language, full_path = download_chinese_subtitle(chinese_info, filename_for_srt, download_folder)
-                                if download_url:  # download_url
-                                    print(f"\nDownloading {language} subtitle...")
-                                    print(f"Download URL: {download_url}")
-                                    
-                                    # Actually download the file
-                                    success, message = download_subtitle_file(download_url, full_path)
-                                    if success:
-                                        print(f"✅ {message}")
-                                    else:
-                                        print(f"❌ {message}")
+                                # Actually download the file
+                                success, message = download_subtitle_file(download_url, full_path)
+                                if success:
+                                    print(f"✅ {message}")
                                 else:
-                                    print("\nNo Chinese subtitle available for download")
+                                    print(f"❌ {message}")
                             else:
-                                print("No Chinese download links found")
+                                print("\nNo Chinese subtitle available for download")
                         else:
-                            print("No Chinese downloads available")
+                            print("No Chinese download links found")
                     else:
-                        error_msg = page_content.get('error', 'Unknown error') if page_content else 'No content returned'
-                        print(f"Error fetching result page content: {error_msg}")
+                        print("No Chinese downloads available")
+                else:
+                    error_msg = page_content.get('error', 'Unknown error') if page_content else 'No content returned'
+                    print(f"Error fetching result page content: {error_msg}")
             else:
                 print("No results found.")
         else:
