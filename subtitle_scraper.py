@@ -231,24 +231,16 @@ def download_subtitle_file(url, full_path):
     except Exception as e:
         return False, f"Error saving subtitle: {e}"
 
-def main():
+def subtitle_handler(src_path, save_path=None):
     """
     Main function to search for subtitles on subtitlecat.com
-    Usage: python3 subtitle_scraper.py <keyword|filename|folder>
-    Example: python3 subtitle_scraper.py NIMA-014
-    Example: python3 subtitle_scraper.py "/path/to/NIMA-014.mp4"
-    Example: python3 subtitle_scraper.py "/path/to/videos/"
+    :param src_path: Source path to search for subtitles (keyword, filename, or folder path)
+    :param save_path: Output directory for downloaded subtitles (default: current directory, input file's directory, or input folder)
+    :return: List of results, each containing: 'success' (bool), 'path' (str), 'error' (str or None)
     """
-    # Create argument parser
-    parser = argparse.ArgumentParser(description="Subtitle scraper for subtitlecat.com")
-    parser.add_argument("input", help="Keyword, filename, or folder path to search for subtitles")
-    parser.add_argument("--output-dir", "-o", default=None, 
-                        help="Output directory for downloaded subtitles (default: current directory, input file's directory, or input folder)")
-    
-    # Parse arguments
-    args = parser.parse_args()
-    input_arg = args.input
-    download_folder = args.output_dir
+    input_arg = src_path
+    download_folder = save_path
+    results = []  # Track processing results
     
     # Check if input is a folder
     if os.path.isdir(input_arg):
@@ -277,19 +269,56 @@ def main():
                     exists, existing_file = is_subtitle_exists(keyword, download_folder)
                     if exists:
                         print(f"Subtitle file already exists for '{keyword}': {existing_file}, skipping...")
+                        # Add existing file to results
+                        results.append({
+                            'success': True,
+                            'path': existing_file,
+                            'error': None
+                        })
                         continue
-                    
-                    print(f"Found keyword '{keyword}' in '{filename}'")
-                    video_files_with_keywords += 1
-                    process_video_file(file_path, download_folder)
-                    print("-" * 50)  # Separator between files
-                else:
-                    print(f"No valid keyword found in '{filename}', skipping...")
+                
+                print(f"Found keyword '{keyword}' in '{filename}'")
+                video_files_with_keywords += 1
+                # Process the video file and collect results
+                result = process_video_file(file_path, download_folder)
+                if result and isinstance(result, tuple):
+                    # 处理process_video_file返回的结果
+                    for item in result[1]:  # result[1]是downloaded_files列表
+                        results.append({
+                            'success': result[0],
+                            'path': item['path'],
+                            'error': item.get('error', None)
+                        })
+                    # 不需要跟踪整体成功状态，因为我们已经在results中记录了每个条目的状态
+                elif result is True:  # For backward compatibility
+                    # 为向后兼容性添加默认结果
+                    results.append({
+                        'success': True,
+                        'path': '',
+                        'error': None
+                    })
+                    # 不需要跟踪整体成功状态，因为我们已经在results中记录了每个条目的状态
+                print("-" * 50)  # Separator between files
+            else:
+                # 添加跳过的文件信息
+                results.append({
+                    'success': False,
+                    'path': '',
+                    'error': f"No valid keyword found in '{filename}'"
+                })
+                print(f"No valid keyword found in '{filename}', skipping...")
         
         if video_files_processed == 0:
             print("No video files found in the folder.")
+            results.append({
+                'success': False,
+                'path': '',
+                'error': "No video files found in the folder"
+            })
+            return results
         else:
             print(f"Found {video_files_processed} video files, processed {video_files_with_keywords} files with extractable keywords.")
+            return results
     elif os.path.isfile(input_arg):
         # Existing file handling logic
         # If no output directory specified and input is an existing file, use its directory
@@ -300,7 +329,32 @@ def main():
             print(f"Using specified output directory: {os.path.abspath(download_folder)}")
         
         # Process the single video file
-        process_video_file(input_arg, download_folder)
+        result = process_video_file(input_arg, download_folder)
+        if result and isinstance(result, tuple):
+            # 处理process_video_file返回的结果
+            for item in result[1]:  # result[1]是downloaded_files列表
+                results.append({
+                    'success': result[0],
+                    'path': item['path'],
+                    'error': item.get('error', None)
+                })
+            # 不需要跟踪整体成功状态，因为我们已经在results中记录了每个条目的状态
+        elif result is True:  # For backward compatibility
+            # 为向后兼容性添加默认结果
+            results.append({
+                'success': True,
+                'path': '',
+                'error': None
+            })
+            # 不需要跟踪整体成功状态，因为我们已经在results中记录了每个条目的状态
+        else:
+            # 添加处理失败的信息
+            results.append({
+                'success': False,
+                'path': '',
+                'error': "Failed to process video file"
+            })
+        return results
     else:
         # Existing keyword handling logic
         if download_folder is None:
@@ -319,7 +373,12 @@ def main():
         
         if not keyword:
             print(f"Could not extract valid keyword from input: {input_arg}")
-            return
+            results.append({
+                'success': False,
+                'path': '',
+                'error': f"Could not extract valid keyword from input: {input_arg}"
+            })
+            return results
             
         print(f"Using keyword for search: {keyword}")
         # Use the input argument as filename for .srt naming
@@ -366,24 +425,120 @@ def main():
                                 print(f"Download URL: {download_url}")
                                 
                                 # Actually download the file
-                                success, message = download_subtitle_file(download_url, full_path)
-                                if success:
+                                success_download, message = download_subtitle_file(download_url, full_path)
+                                if success_download:
                                     print(f"✅ {message}")
+                                    # Add downloaded file info to results
+                                    results.append({
+                                        'success': True,
+                                        'path': full_path,
+                                        'error': None
+                                    })
+                                    return results
                                 else:
                                     print(f"❌ {message}")
+                                    # 添加错误信息到results
+                                    results.append({
+                                        'success': False,
+                                        'path': full_path,
+                                        'error': message
+                                    })
+                                    return results
                             else:
-                                print("\nNo Chinese subtitle available for download")
+                                error_msg = "No Chinese subtitle available for download"
+                                print(f"\n{error_msg}")
+                                # 添加错误信息到results
+                                results.append({
+                                    'success': False,
+                                    'path': os.path.join(download_folder, f"{filename_for_srt}.srt"),
+                                    'error': error_msg
+                                })
+                                return results
                         else:
-                            print("No Chinese download links found")
+                            error_msg = "No Chinese download links found"
+                            print(error_msg)
+                            # 添加错误信息到results
+                            results.append({
+                                'success': False,
+                                'path': os.path.join(download_folder, f"{filename_for_srt}.srt"),
+                                'error': error_msg
+                            })
+                            return results
                     else:
-                        print("No Chinese downloads available")
+                        error_msg = "No Chinese downloads available"
+                        print(error_msg)
+                        # 添加错误信息到results
+                        results.append({
+                            'success': False,
+                            'path': os.path.join(download_folder, f"{filename_for_srt}.srt"),
+                            'error': error_msg
+                        })
+                        return results
                 else:
                     error_msg = page_content.get('error', 'Unknown error') if page_content else 'No content returned'
                     print(f"Error fetching result page content: {error_msg}")
+                    # 添加错误信息到results
+                    results.append({
+                        'success': False,
+                        'path': os.path.join(download_folder, f"{filename_for_srt}.srt"),
+                        'error': f"Error fetching result page content: {error_msg}"
+                    })
+                    return results
             else:
-                print("No results found.")
+                error_msg = "No results found."
+                print(error_msg)
+                # 添加错误信息到results
+                results.append({
+                    'success': False,
+                    'path': os.path.join(download_folder, f"{filename_for_srt}.srt"),
+                    'error': error_msg
+                })
+                return results
         else:
-            print("Failed to retrieve search results.")
+            error_msg = "Failed to retrieve search results."
+            print(error_msg)
+            # 添加错误信息到results
+            results.append({
+                'success': False,
+                'path': os.path.join(download_folder, f"{filename_for_srt}.srt"),
+                'error': error_msg
+            })
+            return results
+
+def main():
+    """
+    Main function to search for subtitles on subtitlecat.com
+    Usage: python3 subtitle_scraper.py <keyword|filename|folder>
+    Example: python3 subtitle_scraper.py NIMA-014
+    Example: python3 subtitle_scraper.py "/path/to/NIMA-014.mp4"
+    Example: python3 subtitle_scraper.py "/path/to/videos/"
+    """
+    # Create argument parser
+    parser = argparse.ArgumentParser(description="Subtitle scraper for subtitlecat.com")
+    parser.add_argument("input", help="Keyword, filename, or folder path to search for subtitles")
+    parser.add_argument("--output-dir", "-o", default=None, 
+                        help="Output directory for downloaded subtitles (default: current directory, input file's directory, or input folder)")
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Call subtitle_handler and get results
+    results = subtitle_handler(args.input, args.output_dir)
+    
+    # Display summary of results
+    print("\n===== Processing Summary =====")
+    success_count = sum(1 for r in results if r['success'])
+    failure_count = len(results) - success_count
+    print(f"Total items processed: {len(results)}")
+    print(f"Successful: {success_count}")
+    print(f"Failed: {failure_count}")
+    
+    if failure_count > 0:
+        print("\nFailed items:")
+        for i, result in enumerate(results):
+            if not result['success']:
+                print(f"  {i+1}. Error: {result['error']}")
+
 
 if __name__ == "__main__":
     main()
