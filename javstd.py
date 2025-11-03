@@ -1,7 +1,7 @@
 import logging
 import os
 import xml.etree.ElementTree as ET
-from subtitle_scraper import subtitle_handler, is_video_file
+from subtitle_scraper import subtitle_handler, is_video_file, extract_keyword
 
 CONFIG = {
     "default": {
@@ -21,8 +21,8 @@ CONFIG = {
         }
     },
     "javstd": {
-        "src_path": "\\\\NAS\\av",
-        "save_path": "\\\\NAS\\jav_subtitle"
+        "src_path": "\\\\YOSEF-NAS\\16t\\media\\qb\\download\\r18\\av",
+        "save_path": "\\\\YOSEF-NAS\\16t\\media\\safe-media\\jav_subtitle"
     }
 }
 
@@ -196,23 +196,33 @@ def main():
             
             logger.info(f"处理视频文件: {os.path.join(root, filename)}")
 
-            # 从src_path中的nfo文件提取num字段值和中文字幕信息
-            nfo_path = os.path.join(root, filename.replace('.mp4', '.nfo').replace('.avi', '.nfo').replace('.mkv', '.nfo'))
-            jav_number, has_chinese_subtitle = extract_info_from_nfo(nfo_path)
-            if not jav_number:
-                logger.warning(f"无法从NFO文件中提取jav_number字段值: {filename}")
-                continue
-            logger.info(f"从NFO文件中提取到jav_number: {jav_number}")
+            # 首先尝试从nfo文件提取num字段值和中文字幕信息
+            jav_number = None
+            has_chinese_subtitle = False
             
-            # 如果NFO文件中标记了有中文字幕，跳过处理
-            if has_chinese_subtitle:
-                logger.debug(f"NFO文件标记已有中文字幕，跳过处理: {filename}")
-                continue
+            nfo_path = os.path.join(root, filename.replace('.mp4', '.nfo').replace('.avi', '.nfo').replace('.mkv', '.nfo'))
+            if os.path.exists(nfo_path):
+                jav_number, has_chinese_subtitle = extract_info_from_nfo(nfo_path)
+                if not jav_number:
+                    continue
+                logger.info(f"从NFO文件提取到jav_number: {jav_number}")
+                # 如果NFO文件中标记了有中文字幕，跳过处理
+                if has_chinese_subtitle:
+                    logger.debug(f"NFO文件标记已有中文字幕，跳过处理: {filename}")
+                    continue
+            
+            # 如果无法从NFO文件中提取jav_number，尝试从文件名提取
+            if not jav_number:
+                jav_number = extract_keyword(filename)
+                if not jav_number:
+                    logger.warning(f"无法从NFO文件或文件名中提取jav_number: {filename}")
+                    continue
+                logger.info(f"从文件名提取到jav_number: {jav_number}")
 
             # 如果字幕库中已存在字幕文件，跳过处理
             subtitle_path = os.path.join(save_path, f"{jav_number}.srt" or f"{jav_number}.ass")
             if os.path.exists(subtitle_path):
-                logger.debug(f"字幕文件已存在，跳过处理: {subtitle_path}")
+                logger.info(f"字幕文件已存在，跳过处理: {subtitle_path}")
                 continue
 
             # 调用subtitle_handler处理字幕
@@ -224,8 +234,8 @@ def main():
                     result_path = results[0].get('path', '')
                     logger.info(f"成功获取字幕: {result_path}")
                     
-                    # 重命名下载的字幕文件，将*.zh-CN.srt重命名为*.srt
-                    if result_path.endswith('.zh-CN.srt'):
+                    # 重命名下载的字幕文件，将*.zh-CN.srt 或 *.zh-TW.srt 重命名为*.srt
+                    if result_path.endswith('.zh-CN.srt') or result_path.endswith('.zh-TW.srt'):
                         new_path = result_path.rsplit('.', 2)[0] + '.srt'
                         os.rename(result_path, new_path)
                         logger.info(f"最终保存字幕文件: {new_path}")

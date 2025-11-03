@@ -145,3 +145,4 @@ Thumbs.db
 output_subs/
 test_videos/
 *.srt
+*.log
